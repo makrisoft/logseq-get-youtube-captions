@@ -3,6 +3,7 @@ import "@logseq/libs";
 import { IHookEvent, SettingSchemaDesc } from "@logseq/libs/dist/LSPlugin";
 import { getSubtitles } from "youtube-captions-scraper";
 import getVideoId from "get-video-id";
+import { autoCompressCaptions } from "./subtitle_ops";
 
 interface RunOpenYoutubeCommand {
   type: "getall";
@@ -50,8 +51,15 @@ async function runSubtitlesCommand(b: IHookEvent, cmd: RunOpenYoutubeCommand) {
           console.log(`getting subtitles for ${youtubeId}`);
           const subs = await getSubtitles({ videoID: youtubeId, lang: captionLanguage });
           if (subs.length > 0) {
-            const allSubtitles = subs.map((s) => s.text).join(lineSplit);
-            await logseq.Editor.insertBlock(currentBlock.uuid, allSubtitles);
+            console.log(`got ${subs.length} subtitles`);
+            const compressedSubs = autoCompressCaptions(subs);
+            console.log(compressedSubs);
+
+            // Compress the subtitles into time intervals and insert each as a separate block
+            for (const sub of autoCompressCaptions(subs)) {
+              const timestampMessage = "{{youtube-timestamp " + Math.trunc(sub.start) + "}} " + sub.text;
+              await logseq.Editor.insertBlock(currentBlock.uuid, timestampMessage);
+            }
           }
         } else {
           console.warn("no youtube id found in block ${currentBlock.content}");
